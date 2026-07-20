@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>BPM</AssemblyName>
+    <RootNamespace>BPM.App</RootNamespace>
+    <ApplicationIcon />
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BPM.Application\BPM.Application.csproj" />
+    <ProjectReference Include="..\BPM.Domain\BPM.Domain.csproj" />
+    <ProjectReference Include="..\BPM.Infrastructure\BPM.Infrastructure.csproj" />
+    <ProjectReference Include="..\BPM.Infrastructure.Win32\BPM.Infrastructure.Win32.csproj" />
+    <ProjectReference Include="..\BPM.Platform.BattleNet\BPM.Platform.BattleNet.csproj" />
+    <ProjectReference Include="..\BPM.Shared\BPM.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    <PackageReference Include="Serilog" Version="4.0.2" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+  </ItemGroup>
+</Project>

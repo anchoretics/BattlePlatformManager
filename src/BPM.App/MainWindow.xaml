@@ -1,0 +1,41 @@
+<Window x:Class="BPM.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Battle Platform Manager"
+        Width="860" Height="520"
+        WindowStartupLocation="CenterScreen">
+  <DockPanel Margin="12">
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+      <Button Content="添加账户" Command="{Binding AddCommand}" />
+      <Button Content="编辑" Command="{Binding EditCommand}" />
+      <Button Content="删除" Command="{Binding DeleteCommand}" />
+      <Button Content="创建桌面快捷方式" Command="{Binding ShortcutCommand}" />
+      <Button Content="导入配置" Command="{Binding ImportCommand}" />
+      <Button Content="导出配置" Command="{Binding ExportCommand}" />
+    </StackPanel>
+
+    <TextBlock DockPanel.Dock="Bottom" Margin="0,8,0,0" Foreground="Gray"
+               Text="提示:每个配置档绑定一个独立 Windows 用户,登录状态互不影响;密码仅保存于 Windows 凭据管理器。" />
+
+    <ListView ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}">
+      <ListView.View>
+        <GridView>
+          <GridViewColumn Header="显示名" Width="140" DisplayMemberBinding="{Binding DisplayName}" />
+          <GridViewColumn Header="Windows 用户" Width="130" DisplayMemberBinding="{Binding WindowsUser}" />
+          <GridViewColumn Header="Battle.net 路径" Width="300" DisplayMemberBinding="{Binding BattleNetPath}" />
+          <GridViewColumn Header="状态" Width="130" DisplayMemberBinding="{Binding Status}" />
+          <GridViewColumn Header="操作" Width="90">
+            <GridViewColumn.CellTemplate>
+              <DataTemplate>
+                <Button Content="启动"
+                        Margin="0"
+                        Command="{Binding DataContext.LaunchCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}" />
+              </DataTemplate>
+            </GridViewColumn.CellTemplate>
+          </GridViewColumn>
+        </GridView>
+      </ListView.View>
+    </ListView>
+  </DockPanel>
+</Window>

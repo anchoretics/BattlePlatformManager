@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>BPM.Platform.BattleNet</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BPM.Application\BPM.Application.csproj" />
+    <ProjectReference Include="..\BPM.Domain\BPM.Domain.csproj" />
+    <ProjectReference Include="..\BPM.Shared\BPM.Shared.csproj" />
+  </ItemGroup>
+</Project>

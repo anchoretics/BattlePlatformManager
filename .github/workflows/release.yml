@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test --configuration Release
+      - name: Publish single-file EXE
+        run: >
+          dotnet publish src/BPM.App/BPM.App.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --output publish
+      - name: Package
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath "BPM-${{ github.ref_name }}-win-x64.zip"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BPM-${{ github.ref_name }}-win-x64.zip
+          generate_release_notes: true
