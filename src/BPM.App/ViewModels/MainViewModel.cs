@@ -14,6 +14,7 @@ public class MainViewModel : ObservableObject
 {
     private readonly AccountService _accountService;
     private readonly LaunchService _launchService;
+    private readonly LocalAccountProvisioningService _provisioningService;
     private readonly IShortcutService _shortcutService;
     private readonly ILogger<MainViewModel> _logger;
     private AccountItemViewModel? _selectedAccount;
@@ -21,11 +22,13 @@ public class MainViewModel : ObservableObject
     public MainViewModel(
         AccountService accountService,
         LaunchService launchService,
+        LocalAccountProvisioningService provisioningService,
         IShortcutService shortcutService,
         ILogger<MainViewModel> logger)
     {
         _accountService = accountService;
         _launchService = launchService;
+        _provisioningService = provisioningService;
         _shortcutService = shortcutService;
         _logger = logger;
 
@@ -108,20 +111,13 @@ public class MainViewModel : ObservableObject
 
     private void OpenEditor(Account account, bool isNew)
     {
-        var editor = new AccountEditorWindow(account, isNew)
+        var editor = new AccountEditorWindow(account, isNew, _accountService, _provisioningService)
         {
             Owner = System.Windows.Application.Current.MainWindow,
         };
 
         if (editor.ShowDialog() != true)
         {
-            return;
-        }
-
-        var result = _accountService.SaveAccount(account, editor.EnteredPassword);
-        if (!result.IsSuccess)
-        {
-            ShowError(result.Message);
             return;
         }
 

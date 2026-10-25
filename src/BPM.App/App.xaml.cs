@@ -37,8 +37,10 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ICredentialService, CredentialManagerService>();
         services.AddSingleton<IProcessLauncher, ProcessLauncherService>();
         services.AddSingleton<IShortcutService, ShortcutService>();
+        services.AddSingleton<IWindowsUserService, WindowsUserService>();
         services.AddSingleton<IGamePlatformAdapter, BattleNetAdapter>();
         services.AddSingleton<AccountService>();
+        services.AddSingleton<LocalAccountProvisioningService>();
         services.AddSingleton<LaunchService>();
         services.AddSingleton<MainViewModel>();
         _serviceProvider = services.BuildServiceProvider();

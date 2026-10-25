@@ -2,16 +2,17 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="账户配置档"
-        Width="560" SizeToContent="Height"
+        Width="600" SizeToContent="Height"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner">
-  <Grid Margin="16">
+  <Grid Margin="16" x:Name="EditorForm">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="130" />
       <ColumnDefinition Width="*" />
       <ColumnDefinition Width="Auto" />
     </Grid.ColumnDefinitions>
     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
@@ -42,33 +43,42 @@
              Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" />
 
     <TextBlock Grid.Row="1" Grid.Column="0" Text="Windows 用户名" />
-    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="WindowsUserInput"
              Text="{Binding WindowsUser, UpdateSourceTrigger=PropertyChanged}" />
 
     <TextBlock Grid.Row="2" Grid.Column="0" Text="Windows 密码" />
     <PasswordBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" x:Name="PasswordInput" />
 
-    <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Foreground="Gray" TextWrapping="Wrap"
+    <StackPanel Grid.Row="3" Grid.ColumnSpan="3" Margin="0,0,0,10" x:Name="CreateUserOptions">
+      <CheckBox x:Name="CreateUserCheckBox"
+                Content="保存时创建 Windows 本地用户（无需先登录桌面）"
+                Checked="CreateUserMode_Changed" Unchecked="CreateUserMode_Changed" />
+      <TextBlock x:Name="CreateUserHint" Visibility="Collapsed" Foreground="Gray" TextWrapping="Wrap"
+                 Margin="20,6,0,0"
+                 Text="需要管理员权限。创建普通用户并初始化配置,密码保存到凭据管理器。系统用户创建后会保留,删除 BPM 配置不会删除系统用户。" />
+    </StackPanel>
+
+    <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Foreground="Gray" TextWrapping="Wrap"
                Margin="0,0,0,10"
-               Text="密码仅写入 Windows 凭据管理器,不会保存到配置文件。编辑时留空表示保留原密码。" />
+               Text="密码仅写入 Windows 凭据管理器,不会保存到配置文件。创建系统账号必须填写密码;使用已保存凭据时可留空。" />
 
-    <TextBlock Grid.Row="4" Grid.Column="0" Text="Battle.net 路径" />
-    <TextBox Grid.Row="4" Grid.Column="1" x:Name="BattleNetPathInput"
+    <TextBlock Grid.Row="5" Grid.Column="0" Text="Battle.net 路径" />
+    <TextBox Grid.Row="5" Grid.Column="1" x:Name="BattleNetPathInput"
              Text="{Binding BattleNetPath, UpdateSourceTrigger=PropertyChanged}" />
-    <Button Grid.Row="4" Grid.Column="2" Content="浏览…" Margin="8,0,0,10" Click="BrowseBattleNet_Click" />
+    <Button Grid.Row="5" Grid.Column="2" Content="浏览…" Margin="8,0,0,10" Click="BrowseBattleNet_Click" />
 
-    <TextBlock Grid.Row="5" Grid.Column="0" Text="魔兽世界目录" />
-    <TextBox Grid.Row="5" Grid.Column="1" x:Name="WowPathInput"
+    <TextBlock Grid.Row="6" Grid.Column="0" Text="魔兽世界目录" />
+    <TextBox Grid.Row="6" Grid.Column="1" x:Name="WowPathInput"
              Text="{Binding WowPath, UpdateSourceTrigger=PropertyChanged}" />
-    <Button Grid.Row="5" Grid.Column="2" Content="浏览…" Margin="8,0,0,10" Click="BrowseWow_Click" />
+    <Button Grid.Row="6" Grid.Column="2" Content="浏览…" Margin="8,0,0,10" Click="BrowseWow_Click" />
 
-    <CheckBox Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,14"
+    <CheckBox Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,14"
               Content="启动 Battle.net 后自动启动《魔兽世界》"
               IsChecked="{Binding AutoLaunchWow}" />
 
-    <StackPanel Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3"
+    <StackPanel Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3"
                 Orientation="Horizontal" HorizontalAlignment="Right">
-      <Button Content="保存" IsDefault="True" Click="Save_Click" />
+      <Button x:Name="SaveButton" Content="保存" IsDefault="True" Click="Save_Click" />
       <Button Content="取消" IsCancel="True" Margin="0" />
     </StackPanel>
   </Grid>

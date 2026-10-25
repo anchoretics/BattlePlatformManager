@@ -30,6 +30,22 @@
 
 依据:[CreateEnvironmentBlock](https://learn.microsoft.com/en-us/windows/win32/api/userenv/nf-userenv-createenvironmentblock) 的用户配置加载要求,以及 [CreateProcessWithLogonW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithlogonw) 的 `LOGON_WITH_PROFILE` / `lpEnvironment` 约定。
 
+## 本地系统用户创建
+
+| API | 用途 |
+| --- | --- |
+| `NetUserAdd` | 在本机创建普通用户,设置用户输入的 Windows 密码,遵循本机密码策略 |
+| `NetUserGetInfo` / `NetApiBufferFree` | 查询本地用户 SID 并释放返回的缓冲区 |
+| `NetLocalGroupAddMembers` | 将新用户加入本机 Users 组,组名通过内置组 SID 解析,兼容中文 Windows |
+| `CreateProfile` | 为该 SID 创建用户配置文件,无需先登录一次用户桌面 |
+
+- 以上创建 / 初始化流程需要管理员权限。新用户只加入 Users 组;不修改系统登录策略或共享游戏目录权限。
+- `CreateProfile` 返回配置已存在、组成员已存在时视为该阶段已完成,支持失败重试。
+- 账户已存在时不覆盖密码。系统用户创建后独立保留,取消配置或删除 BPM 配置不会删除系统用户。
+- 原生 API 替身测试覆盖权限、同名用户、密码策略、初始化及重试。自动化测试不会创建真实系统用户。
+
+依据:[NetUserAdd](https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netuseradd)、[CreateProfile](https://learn.microsoft.com/en-us/windows/win32/api/userenv/nf-userenv-createprofile)。
+
 ## 凭据管理
 
 | API | 用途 |

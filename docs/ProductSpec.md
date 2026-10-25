@@ -20,6 +20,7 @@
 | 功能 | 说明 |
 | --- | --- |
 | 账户管理 | 配置档增删改、导入导出;绑定 Windows 用户与游戏路径 |
+| 创建系统账号 | 添加配置时可创建普通本地用户并初始化用户配置,无需手动登录 Windows 桌面;需要管理员权限,保留已有用户密码 |
 | 凭据管理 | 密码仅存 Windows Credential Manager,配置文件零明文 |
 | 启动 | `CreateProcessWithLogonW` + `LOGON_WITH_PROFILE`,加载目标用户 Profile |
 | 快捷方式 | 桌面 `.lnk` 指向 `BPM.exe --launch <accountId>` |

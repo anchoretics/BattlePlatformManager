@@ -17,6 +17,10 @@ public enum ErrorCode
     LaunchFailed,
     ShortcutFailed,
     Unexpected,
+    AdministratorRequired,
+    WindowsUserAlreadyExists,
+    WindowsUserCreationFailed,
+    UserProfileInitializationFailed,
 }
 
 /// <summary>轻量结果类型:携带成功/失败、错误码、面向用户的消息与底层 Win32 错误码。</summary>
