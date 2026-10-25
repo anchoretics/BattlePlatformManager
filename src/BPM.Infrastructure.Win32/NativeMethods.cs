@@ -4,15 +4,12 @@ using System.Text;
 
 namespace BPM.Infrastructure.Win32;
 
-/// <summary>advapi32 / userenv / kernel32 P/Invoke 声明。仅封装官方文档化 API,不做任何注入或 Hook。</summary>
+/// <summary>advapi32 / kernel32 P/Invoke 声明。仅封装官方文档化 API,不做任何注入或 Hook。</summary>
 [SupportedOSPlatform("windows")]
 internal static class NativeMethods
 {
     internal const int LOGON_WITH_PROFILE = 0x00000001;
     internal const int CREATE_UNICODE_ENVIRONMENT = 0x00000400;
-
-    internal const int LOGON32_LOGON_INTERACTIVE = 2;
-    internal const int LOGON32_PROVIDER_DEFAULT = 0;
 
     internal const uint CRED_TYPE_GENERIC = 1;
     internal const uint CRED_PERSIST_LOCAL_MACHINE = 2;
@@ -88,24 +85,6 @@ internal static class NativeMethods
         string? lpCurrentDirectory,
         ref STARTUPINFO lpStartupInfo,
         out PROCESS_INFORMATION lpProcessInformation);
-
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    internal static extern bool LogonUserW(
-        string lpszUsername,
-        string? lpszDomain,
-        string lpszPassword,
-        int dwLogonType,
-        int dwLogonProvider,
-        out IntPtr phToken);
-
-    [DllImport("userenv.dll", SetLastError = true)]
-    internal static extern bool CreateEnvironmentBlock(
-        out IntPtr lpEnvironment,
-        IntPtr hToken,
-        bool bInherit);
-
-    [DllImport("userenv.dll", SetLastError = true)]
-    internal static extern bool DestroyEnvironmentBlock(IntPtr lpEnvironment);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern bool CloseHandle(IntPtr hObject);

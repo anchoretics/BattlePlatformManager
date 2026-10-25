@@ -6,18 +6,17 @@
 
 | API | 用途 |
 | --- | --- |
-| `LogonUserW` | 预校验凭据(快速失败、友好报错)并获取用户令牌 |
-| `CreateEnvironmentBlock` / `DestroyEnvironmentBlock` | 由令牌生成目标用户环境变量块 |
-| `CreateProcessWithLogonW` | 在目标用户上下文启动进程 |
-| `CloseHandle` | 释放进程 / 线程 / 令牌句柄 |
+| `CreateProcessWithLogonW` | 校验凭据、加载目标用户配置文件、由系统生成用户环境并启动进程 |
+| `CloseHandle` | 释放进程 / 线程句柄 |
 
 关键参数:
 
 | 参数 | 值 | 说明 |
 | --- | --- | --- |
 | `dwLogonFlags` | `LOGON_WITH_PROFILE (0x1)` | 加载目标用户 Profile,Battle.net 才能读到自己的 AppData |
-| `dwCreationFlags` | `CREATE_UNICODE_ENVIRONMENT (0x400)` | 环境块为 Unicode |
-| `lpApplicationName` | `null` | 路径经引号包裹后放入 `lpCommandLine` |
+| `dwCreationFlags` | `CREATE_UNICODE_ENVIRONMENT (0x400)` | Unicode 环境标志 |
+| `lpEnvironment` | `IntPtr.Zero` (`NULL`) | 由系统从目标用户配置文件生成环境,不提前生成或继承 BPM 的环境 |
+| `lpApplicationName` | 启动器完整路径 | 显式指定可执行文件 |
 | `lpCommandLine` | `StringBuilder` | API 要求可写缓冲区 |
 | `lpCurrentDirectory` | Battle.net 安装目录 | |
 
@@ -25,7 +24,11 @@
 
 - 依赖 **Secondary Logon(seclogon)** 服务;禁用时报 `1058/1062`,已映射为友好提示。
 - 常见错误映射:`1326` 凭据错误、`1327` 账户受限(空密码)、`1385` 无交互式登录权限、`2/3` 路径无效。
-- 所有句柄与环境块在 `finally` 中释放;失败路径记录 `Win32Error`。
+- 进程 / 线程句柄在 `finally` 中释放;失败路径记录 `Win32Error`。
+- 不再预先调用 `LogonUserW` / `CreateEnvironmentBlock`:目标用户在开机后尚未加载配置文件时,提前生成的环境可能缺少用户专属变量,影响战网读取登录状态和安装位置。
+- `LOGON_WITH_PROFILE` 与 `lpEnvironment = NULL` 的组合交由系统加载配置并生成目标用户环境。即使 BPM 以管理员身份运行,子进程也使用配置绑定的 Windows 用户身份和环境。
+
+依据:[CreateEnvironmentBlock](https://learn.microsoft.com/en-us/windows/win32/api/userenv/nf-userenv-createenvironmentblock) 的用户配置加载要求,以及 [CreateProcessWithLogonW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithlogonw) 的 `LOGON_WITH_PROFILE` / `lpEnvironment` 约定。
 
 ## 凭据管理
 

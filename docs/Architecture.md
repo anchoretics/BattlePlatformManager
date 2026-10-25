@@ -37,9 +37,8 @@ BPM.Shared(Result / ErrorCode)
     → ICredentialService.Get()             从 Credential Manager 取凭据
     → IGamePlatformAdapter.BuildLaunchRequest()    构造启动请求
     → IProcessLauncher.Launch()
-        → LogonUserW                       校验凭据 + 获取令牌
-        → CreateEnvironmentBlock           生成目标用户环境块
-        → CreateProcessWithLogonW(LOGON_WITH_PROFILE)
+        → CreateProcessWithLogonW(LOGON_WITH_PROFILE, lpEnvironment = NULL)
+            校验凭据、加载目标用户配置文件、由系统生成目标用户环境
   → Battle.net 在目标用户上下文启动,读写该用户自己的 AppData
 ```
 

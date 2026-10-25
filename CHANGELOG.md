@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 修正目标用户环境的生成时机:由 `CreateProcessWithLogonW(LOGON_WITH_PROFILE, lpEnvironment = NULL)` 加载用户配置并生成环境,解决开机首次启动战网时登录状态异常、需要重新定位游戏目录及游戏启动失败的问题。2026-10-25 用户实机验证通过。
+- 保留直接创建进程时的凭据错误、账户受限和登录权限错误提示,增加无需真实用户密码的启动回归测试。
+
 ### Added
 
 - 首个版本:Battle.net 多 Windows 用户配置档管理与一键启动。

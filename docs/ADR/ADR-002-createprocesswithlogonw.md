@@ -15,7 +15,9 @@
 
 ## 决策
 
-选方案 4。先 `LogonUserW` 校验凭据并生成目标用户环境块,再 `CreateProcessWithLogonW` 启动;隔离强度等同真实登录该用户,零游戏文件改动。
+选方案 4。使用 `CreateProcessWithLogonW(LOGON_WITH_PROFILE, lpEnvironment = NULL)` 校验凭据、加载目标用户配置文件并由系统生成环境,零游戏文件改动。
+
+2026-10-24 修订:移除启动前的 `LogonUserW` 和 `CreateEnvironmentBlock`。开机后目标用户配置文件可能尚未加载,提前生成的环境无法保证包含用户专属变量;由系统按目标用户配置生成环境,避免首次与后续启动使用不同环境。
 
 ## 结果
 
