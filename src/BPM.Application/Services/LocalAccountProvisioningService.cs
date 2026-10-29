@@ -105,7 +105,42 @@ public class LocalAccountProvisioningService
         return save.IsSuccess ? save : Incomplete(save);
     }
 
+    /// <summary>显式恢复已存在的本地用户,不创建用户或重置其 Windows 密码。</summary>
+    public Result InitializeAndSave(Account account, string? password)
+    {
+        var userValidation = LocalWindowsUserValidator.Validate(account.WindowsUser);
+        if (!userValidation.IsSuccess)
+        {
+            return userValidation;
+        }
+
+        if (string.IsNullOrEmpty(password) || password.Contains('\0'))
+        {
+            return Result.Fail(ErrorCode.ValidationFailed, "恢复已有系统账号时,请填写该用户原来的 Windows 密码。");
+        }
+
+        if (string.IsNullOrWhiteSpace(account.CredentialKey))
+        {
+            account.CredentialKey = $"BPM_Local_{account.Id:N}";
+        }
+
+        var validation = AccountValidator.Validate(account);
+        if (!validation.IsSuccess)
+        {
+            return validation;
+        }
+
+        var config = _accountService.GetConfig();
+        if (!config.IsSuccess)
+        {
+            return config;
+        }
+
+        var initialize = _windowsUserService.InitializeProfile(account.WindowsUser);
+        return initialize.IsSuccess ? _accountService.SaveAccount(account, password) : initialize;
+    }
+
     private static Result Incomplete(Result failure) => Result.Fail(failure.Code,
-        $"系统账号已创建,但设置尚未完成:{failure.Message}\n请保留此窗口重试;退出窗口也不会删除已创建的 Windows 用户。",
+        $"系统账号已创建,但设置尚未完成:{failure.Message}\n请保留此窗口重试。重启 BPM 后可选择“仅初始化已有本地用户”,填写原用户名和密码继续,无需重新创建。",
         failure.Win32Error);
 }

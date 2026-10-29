@@ -22,4 +22,7 @@ public class Account
 
     /// <summary>启动 Battle.net 后是否自动拉起 WoW(通过启动器官方命令行参数)。</summary>
     public bool AutoLaunchWow { get; set; }
+
+    /// <summary>辅助战网向同一 Windows 用户的浏览器交接登录；可关闭以使用系统原生流程。</summary>
+    public bool BrowserLoginAssistEnabled { get; set; } = true;
 }

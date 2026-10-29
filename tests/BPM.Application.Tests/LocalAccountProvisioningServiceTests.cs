@@ -180,6 +180,62 @@ public class LocalAccountProvisioningServiceTests
         _windowsUsers.CreateCalls.Should().Be(0);
     }
 
+    [Fact]
+    public void InitializeAndSave_ExistingUser_InitializesAndSavesWithoutCreatingUser()
+    {
+        var result = _service.InitializeAndSave(_account, Password);
+
+        result.IsSuccess.Should().BeTrue();
+        _windowsUsers.CreateCalls.Should().Be(0);
+        _windowsUsers.InitializeCalls.Should().Be(1);
+        _credentials.Store[_account.CredentialKey].Password.Should().Be(Password);
+        _config.Config.Accounts.Should().ContainSingle().Which.WindowsUser.Should().Be("WoW2");
+    }
+
+    [Fact]
+    public void InitializeAndSave_ProfileFailure_DoesNotPersistConfigOrOverwritePassword()
+    {
+        _windowsUsers.InitializeResult = Result.Fail(ErrorCode.UserProfileInitializationFailed, "失败");
+
+        _service.InitializeAndSave(_account, Password).Code.Should().Be(ErrorCode.UserProfileInitializationFailed);
+
+        _windowsUsers.CreateCalls.Should().Be(0);
+        _credentials.Store.Should().BeEmpty();
+        _config.Config.Accounts.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    [InlineData("invalid\0password")]
+    public void InitializeAndSave_RequiresOriginalPassword(string? password)
+    {
+        _service.InitializeAndSave(_account, password).Code.Should().Be(ErrorCode.ValidationFailed);
+
+        _windowsUsers.InitializeCalls.Should().Be(0);
+        _credentials.Store.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void InitializeAndSave_DomainUser_DoesNotInitializeProfile()
+    {
+        _account.WindowsUser = @"DOMAIN\WoW2";
+
+        _service.InitializeAndSave(_account, Password).Code.Should().Be(ErrorCode.ValidationFailed);
+
+        _windowsUsers.InitializeCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public void InitializeAndSave_UnreadableConfig_DoesNotInitializeProfile()
+    {
+        _config.LoadFailure = Result.Fail(ErrorCode.ConfigCorrupted, "配置损坏");
+
+        _service.InitializeAndSave(_account, Password).Code.Should().Be(ErrorCode.ConfigCorrupted);
+
+        _windowsUsers.InitializeCalls.Should().Be(0);
+    }
+
     private sealed class FakeWindowsUserService : IWindowsUserService
     {
         public Result CreateResult { get; set; } = Result.Ok();

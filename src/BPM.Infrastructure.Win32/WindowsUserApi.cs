@@ -15,9 +15,24 @@ internal interface IWindowsUserApi
     int CreateProfile(string sid, string userName);
 }
 
+internal delegate int CreateProfileCall(string sid, string userName, StringBuilder profilePath, uint profilePathLength);
+
 [SupportedOSPlatform("windows")]
 internal sealed class WindowsUserApi : IWindowsUserApi
 {
+    // Profile Service 的 RPC 输出路径使用 MAX_PATH,不能按长路径缓冲区传入 1024。
+    private const int ProfilePathCapacity = 260;
+    private readonly CreateProfileCall _createProfile;
+
+    public WindowsUserApi() : this(NativeMethods.CreateProfile)
+    {
+    }
+
+    internal WindowsUserApi(CreateProfileCall createProfile)
+    {
+        _createProfile = createProfile;
+    }
+
     public bool IsAdministrator
     {
         get
@@ -80,7 +95,7 @@ internal sealed class WindowsUserApi : IWindowsUserApi
 
     public int CreateProfile(string sid, string userName)
     {
-        var profilePath = new StringBuilder(1024);
-        return NativeMethods.CreateProfile(sid, userName, profilePath, (uint)profilePath.Capacity);
+        var profilePath = new StringBuilder(ProfilePathCapacity);
+        return _createProfile(sid, userName, profilePath, (uint)profilePath.Capacity);
     }
 }

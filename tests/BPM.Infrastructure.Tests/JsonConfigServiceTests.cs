@@ -64,6 +64,19 @@ public class JsonConfigServiceTests : IDisposable
     }
 
     [Fact]
+    public void Load_LegacyConfigEnablesAssistAndExplicitOptOutSurvivesSave()
+    {
+        // 旧配置没有新字段，应直接可用，无需迁移或重新录入密码。
+        File.WriteAllText(_configPath, "{\"Version\":1,\"Accounts\":[{\"DisplayName\":\"主号\",\"WindowsUser\":\"WoW1\",\"CredentialKey\":\"BPM_WoW1\",\"BattleNetPath\":\"Battle.net.exe\"}]}");
+        _service.Load().Value.Accounts[0].BrowserLoginAssistEnabled.Should().BeTrue();
+
+        var config = CreateConfig();
+        config.Accounts[0].BrowserLoginAssistEnabled = false;
+        _service.Save(config).IsSuccess.Should().BeTrue();
+        _service.Load().Value.Accounts[0].BrowserLoginAssistEnabled.Should().BeFalse();
+    }
+
+    [Fact]
     public void Save_NeverWritesPasswordLikeContent()
     {
         _service.Save(CreateConfig());
@@ -120,5 +133,53 @@ public class JsonConfigServiceTests : IDisposable
 
         result.IsSuccess.Should().BeFalse();
         result.Code.Should().Be(ErrorCode.ConfigCorrupted);
+    }
+
+    public static IEnumerable<object[]> InvalidStructures()
+    {
+        yield return ["null"];
+        yield return ["{\"Accounts\":null}"];
+        yield return ["{\"Accounts\":[null]}"];
+        yield return ["{\"Accounts\":[{}]}"];
+        yield return ["{\"BattleNetPath\":null}"];
+        foreach (var property in new[] { "Id", "DisplayName", "WindowsUser", "CredentialKey", "BattleNetPath", "WowPath" })
+        {
+            var config = CreateConfig();
+            var account = config.Accounts[0];
+            if (property == "Id") account.Id = Guid.Empty;
+            else typeof(Account).GetProperty(property)!.SetValue(account, null);
+            yield return [System.Text.Json.JsonSerializer.Serialize(config)];
+        }
+        var duplicate = CreateConfig();
+        duplicate.Accounts.Add(duplicate.Accounts[0]);
+        yield return [System.Text.Json.JsonSerializer.Serialize(duplicate)];
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidStructures))]
+    public void Import_InvalidStructurePreservesExistingConfigAndLoadReturnsFriendlyFailure(string json)
+    {
+        _service.Save(CreateConfig()).IsSuccess.Should().BeTrue();
+        var original = File.ReadAllBytes(_configPath);
+        var invalidPath = Path.Combine(_tempDir, "invalid-structure.json");
+        File.WriteAllText(invalidPath, json);
+
+        var imported = _service.Import(invalidPath);
+
+        imported.Code.Should().Be(ErrorCode.ConfigCorrupted);
+        File.ReadAllBytes(_configPath).Should().Equal(original);
+        _service.Load().IsSuccess.Should().BeTrue();
+
+        File.WriteAllText(_configPath, json);
+        _service.Load().Code.Should().Be(ErrorCode.ConfigCorrupted);
+    }
+
+    [Fact]
+    public void Save_InvalidStructurePreservesExistingConfig()
+    {
+        _service.Save(CreateConfig()).IsSuccess.Should().BeTrue();
+        var original = File.ReadAllBytes(_configPath);
+        _service.Save(new Config { Accounts = null! }).Code.Should().Be(ErrorCode.ConfigCorrupted);
+        File.ReadAllBytes(_configPath).Should().Equal(original);
     }
 }

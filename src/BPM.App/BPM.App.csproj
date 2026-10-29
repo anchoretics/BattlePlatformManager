@@ -5,9 +5,10 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>BPM</AssemblyName>
     <RootNamespace>BPM.App</RootNamespace>
-    <ApplicationIcon />
+    <ApplicationIcon>Assets\BPM.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Resource Include="Assets\BPM.ico" />
     <ProjectReference Include="..\BPM.Application\BPM.Application.csproj" />
     <ProjectReference Include="..\BPM.Domain\BPM.Domain.csproj" />
     <ProjectReference Include="..\BPM.Infrastructure\BPM.Infrastructure.csproj" />

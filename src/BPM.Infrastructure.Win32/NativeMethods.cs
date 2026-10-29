@@ -147,5 +147,5 @@ internal static class NativeMethods
         string? serverName, string groupName, uint level, ref LOCALGROUP_MEMBERS_INFO_3 member, uint totalEntries);
 
     [DllImport("userenv.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
-    internal static extern int CreateProfile(string userSid, string userName, StringBuilder profilePath, uint profilePathLength);
+    internal static extern int CreateProfile(string userSid, string userName, [Out] StringBuilder profilePath, uint profilePathLength);
 }

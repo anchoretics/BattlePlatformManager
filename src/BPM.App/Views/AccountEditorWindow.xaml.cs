@@ -35,10 +35,13 @@ public partial class AccountEditorWindow : Window
         }
 
         var createUser = CreateUserCheckBox.IsChecked == true;
+        var initializeExistingUser = InitializeExistingUserCheckBox.IsChecked == true;
         var password = PasswordInput.Password;
-        if (createUser && string.IsNullOrEmpty(password))
+        if ((createUser || initializeExistingUser) && string.IsNullOrEmpty(password))
         {
-            MessageBox.Show(this, "创建系统账号必须填写 Windows 密码。", "提示",
+            MessageBox.Show(this, initializeExistingUser
+                    ? "请填写已有系统用户原来的 Windows 密码。"
+                    : "创建系统账号必须填写 Windows 密码。", "提示",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -46,13 +49,15 @@ public partial class AccountEditorWindow : Window
         _isBusy = true;
         EditorForm.IsEnabled = false;
         Cursor = Cursors.Wait;
-        SaveButton.Content = createUser ? "正在创建…" : "正在保存…";
+        SaveButton.Content = createUser ? "正在创建…" : initializeExistingUser ? "正在初始化…" : "正在保存…";
         var saved = false;
         try
         {
             var result = await Task.Run(() => createUser
                 ? _provisioningService.CreateAndSave(_account, password, _setupProgress)
-                : _accountService.SaveAccount(_account, string.IsNullOrEmpty(password) ? null : password));
+                : initializeExistingUser
+                    ? _provisioningService.InitializeAndSave(_account, password)
+                    : _accountService.SaveAccount(_account, string.IsNullOrEmpty(password) ? null : password));
             if (!result.IsSuccess)
             {
                 MessageBox.Show(this, result.Message, "保存失败", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -79,7 +84,9 @@ public partial class AccountEditorWindow : Window
             WindowsUserInput.IsReadOnly = _setupProgress.UserCreated;
             PasswordInput.IsEnabled = !_setupProgress.UserCreated;
             CreateUserCheckBox.IsEnabled = !_setupProgress.UserCreated;
-            SaveButton.Content = _setupProgress.UserCreated ? "重试并保存" : createUser ? "创建并保存" : "保存";
+            InitializeExistingUserCheckBox.IsEnabled = !_setupProgress.UserCreated;
+            SaveButton.Content = _setupProgress.UserCreated ? "重试并保存"
+                : createUser ? "创建并保存" : initializeExistingUser ? "初始化并保存" : "保存";
         }
 
         if (saved)
@@ -92,14 +99,27 @@ public partial class AccountEditorWindow : Window
     private void CreateUserMode_Changed(object sender, RoutedEventArgs e)
     {
         // XAML 初始化期间控件可能尚未全部创建。
-        if (SaveButton is null || CreateUserHint is null)
+        if (SaveButton is null || CreateUserHint is null || InitializeExistingUserCheckBox is null)
         {
             return;
         }
 
+        if (ReferenceEquals(sender, CreateUserCheckBox) && CreateUserCheckBox.IsChecked == true)
+        {
+            InitializeExistingUserCheckBox.IsChecked = false;
+        }
+        else if (ReferenceEquals(sender, InitializeExistingUserCheckBox) && InitializeExistingUserCheckBox.IsChecked == true)
+        {
+            CreateUserCheckBox.IsChecked = false;
+        }
+
         var createUser = CreateUserCheckBox.IsChecked == true;
-        CreateUserHint.Visibility = createUser ? Visibility.Visible : Visibility.Collapsed;
-        SaveButton.Content = createUser ? "创建并保存" : "保存";
+        var initializeUser = InitializeExistingUserCheckBox.IsChecked == true;
+        CreateUserHint.Visibility = createUser || initializeUser ? Visibility.Visible : Visibility.Collapsed;
+        CreateUserHint.Text = initializeUser
+            ? "需要管理员权限。填写已有用户的原 Windows 密码,初始化用户配置并保存 BPM 配置;不会重新创建用户或重置 Windows 密码。"
+            : "需要管理员权限。创建普通用户并初始化配置,密码保存到凭据管理器。系统用户创建后会保留,删除 BPM 配置不会删除系统用户。";
+        SaveButton.Content = createUser ? "创建并保存" : initializeUser ? "初始化并保存" : "保存";
     }
 
     private void BrowseBattleNet_Click(object sender, RoutedEventArgs e)

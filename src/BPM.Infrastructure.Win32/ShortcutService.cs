@@ -21,29 +21,33 @@ public class ShortcutService : IShortcutService
 
     public Result<string> CreateLaunchShortcut(Account account)
     {
+        var processPath = Environment.ProcessPath;
+        var exePath = !string.IsNullOrEmpty(processPath) && !Path.GetFileNameWithoutExtension(processPath).Equals("dotnet", StringComparison.OrdinalIgnoreCase)
+            ? processPath : Path.Combine(AppContext.BaseDirectory, "BPM.exe");
+        if (string.IsNullOrEmpty(exePath))
+            return Result<string>.Fail(ErrorCode.ShortcutFailed, "无法确定 BPM 程序自身路径。");
+        return CreateLaunchShortcut(account, exePath, Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+    }
+
+    internal Result<string> CreateLaunchShortcut(Account account, string exePath, string desktop)
+    {
         try
         {
-            var exePath = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(exePath))
-            {
-                return Result<string>.Fail(ErrorCode.ShortcutFailed, "无法确定 BPM 程序自身路径。");
-            }
-
-            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             var safeName = string.Join("_", account.DisplayName.Split(Path.GetInvalidFileNameChars()));
             var shortcutPath = Path.Combine(desktop, $"Battle.net - {safeName}.lnk");
 
             var link = (IShellLinkW)new ShellLink();
-            link.SetPath(exePath);
-            link.SetArguments($"--launch {account.Id}");
-            link.SetWorkingDirectory(Path.GetDirectoryName(exePath) ?? string.Empty);
-            link.SetDescription($"以 Windows 用户 {account.WindowsUser} 启动 Battle.net({account.DisplayName})");
-            if (File.Exists(account.BattleNetPath))
+            try
             {
-                link.SetIconLocation(account.BattleNetPath, 0);
+                link.SetPath(exePath);
+                link.SetArguments($"--launch {account.Id}");
+                link.SetWorkingDirectory(Path.GetDirectoryName(exePath) ?? string.Empty);
+                link.SetDescription($"以 Windows 用户 {account.WindowsUser} 启动 Battle.net({account.DisplayName})");
+                if (File.Exists(account.BattleNetPath)) link.SetIconLocation(account.BattleNetPath, 0);
+                // 不在快捷方式强制 RunAs：已有实例可普通权限转交；首个进程自行请求提升。
+                ((IPersistFile)link).Save(shortcutPath, fRemember: false);
             }
-
-            ((IPersistFile)link).Save(shortcutPath, fRemember: false);
+            finally { Marshal.FinalReleaseComObject(link); }
             _logger.LogInformation("已创建快捷方式 {ShortcutPath}", shortcutPath);
             return Result<string>.Ok(shortcutPath);
         }
@@ -59,6 +63,7 @@ public class ShortcutService : IShortcutService
     private class ShellLink
     {
     }
+
 
     [ComImport]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

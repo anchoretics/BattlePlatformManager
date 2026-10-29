@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Windows;
 using BPM.App.Views;
 using BPM.Application.Abstractions;
 using BPM.Application.Services;
+using BPM.Application.Models;
 using BPM.Domain.Models;
 using Microsoft.Extensions.Logging;
 
@@ -17,6 +17,8 @@ public class MainViewModel : ObservableObject
     private readonly LocalAccountProvisioningService _provisioningService;
     private readonly IShortcutService _shortcutService;
     private readonly ILogger<MainViewModel> _logger;
+    private readonly IBrowserLoginAssist _loginAssist;
+    private readonly IAccountDeletionConfirmation _deletionConfirmation;
     private AccountItemViewModel? _selectedAccount;
 
     public MainViewModel(
@@ -24,21 +26,29 @@ public class MainViewModel : ObservableObject
         LaunchService launchService,
         LocalAccountProvisioningService provisioningService,
         IShortcutService shortcutService,
-        ILogger<MainViewModel> logger)
+        ILogger<MainViewModel> logger,
+        IBrowserLoginAssist loginAssist,
+        IAccountDeletionConfirmation? deletionConfirmation = null)
     {
         _accountService = accountService;
         _launchService = launchService;
         _provisioningService = provisioningService;
         _shortcutService = shortcutService;
         _logger = logger;
+        _loginAssist = loginAssist;
+        _deletionConfirmation = deletionConfirmation ?? new AccountDeletionConfirmation();
+        _loginAssist.StatusChanged += status => System.Windows.Application.Current?.Dispatcher.BeginInvoke(
+            new Action(() => ApplyLoginStatus(status)));
 
         AddCommand = new RelayCommand(_ => AddAccount());
-        EditCommand = new RelayCommand(_ => EditAccount(), _ => SelectedAccount is not null);
-        DeleteCommand = new RelayCommand(_ => DeleteAccount(), _ => SelectedAccount is not null);
+        EditCommand = new RelayCommand(_ => EditAccount(), _ => SelectedAccount is { IsBusy: false });
+        DeleteCommand = new RelayCommand(_ => DeleteAccount(), _ => SelectedAccount is { IsBusy: false });
         LaunchCommand = new RelayCommand(p => LaunchAccount(p as AccountItemViewModel ?? SelectedAccount),
-            p => (p as AccountItemViewModel ?? SelectedAccount) is not null);
+            p => (p as AccountItemViewModel ?? SelectedAccount) is { IsBusy: false });
+        RetryLoginCommand = new RelayCommand(_ => RetryLogin(), _ => SelectedAccount is { IsBusy: false });
+        LoginHelpCommand = new RelayCommand(_ => ShowLoginHelp(), _ => SelectedAccount is not null);
         ShortcutCommand = new RelayCommand(_ => CreateShortcut(), _ => SelectedAccount is not null);
-        ImportCommand = new RelayCommand(_ => ImportConfig());
+        ImportCommand = new RelayCommand(_ => ImportConfig(), _ => Accounts.All(a => !a.IsBusy));
         ExportCommand = new RelayCommand(_ => ExportConfig());
 
         Reload();
@@ -59,10 +69,13 @@ public class MainViewModel : ObservableObject
     public RelayCommand ShortcutCommand { get; }
     public RelayCommand ImportCommand { get; }
     public RelayCommand ExportCommand { get; }
+    public RelayCommand RetryLoginCommand { get; }
+    public RelayCommand LoginHelpCommand { get; }
 
     private void Reload()
     {
-        Accounts.Clear();
+        var oldItems = Accounts.DistinctBy(a => a.Id).ToDictionary(a => a.Id);
+        var selectedId = SelectedAccount?.Id;
         var accounts = _accountService.GetAccounts();
         if (!accounts.IsSuccess)
         {
@@ -70,10 +83,16 @@ public class MainViewModel : ObservableObject
             return;
         }
 
+        Accounts.Clear();
         foreach (var account in accounts.Value)
         {
-            Accounts.Add(new AccountItemViewModel(account));
+            // 保留行对象，异步启动的完成回调仍能更新当前列表中的忙碌和结果状态。
+            var item = oldItems.TryGetValue(account.Id, out var old) ? old : new AccountItemViewModel(account);
+            item.UpdateAccount(account);
+            Accounts.Add(item);
+            if (_loginAssist.GetStatus(account.Id) is { } status) ApplyLoginStatus(status);
         }
+        SelectedAccount = Accounts.FirstOrDefault(a => a.Id == selectedId) ?? Accounts.FirstOrDefault();
     }
 
     private void AddAccount()
@@ -105,6 +124,7 @@ public class MainViewModel : ObservableObject
             BattleNetPath = source.BattleNetPath,
             WowPath = source.WowPath,
             AutoLaunchWow = source.AutoLaunchWow,
+            BrowserLoginAssistEnabled = source.BrowserLoginAssistEnabled,
         };
         OpenEditor(clone, isNew: false);
     }
@@ -121,78 +141,110 @@ public class MainViewModel : ObservableObject
             return;
         }
 
+        _loginAssist.Stop(account.Id);
         Reload();
     }
 
     private void DeleteAccount()
     {
-        if (SelectedAccount is null)
+        var item = SelectedAccount;
+        if (item is null || item.IsBusy)
         {
             return;
         }
 
-        var confirm = MessageBox.Show(
-            $"确定删除配置档“{SelectedAccount.DisplayName}”吗?\n(若无其他配置档共用,其保存的 Windows 凭据也会一并删除。)",
-            "删除确认",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.Yes)
+        // 模态窗口会继续处理单实例转交等消息；选中项可能在确认期间改变。
+        var accountId = item.Id;
+        if (!_deletionConfirmation.Confirm(item.DisplayName) || item.IsBusy)
         {
             return;
         }
 
-        var result = _accountService.DeleteAccount(SelectedAccount.Id);
+        var result = _accountService.DeleteAccount(accountId);
         if (!result.IsSuccess)
         {
             ShowError(result.Message);
             return;
         }
 
+        _loginAssist.Stop(accountId);
         Reload();
     }
 
     private async void LaunchAccount(AccountItemViewModel? item)
     {
-        if (item is null)
+        if (item is null || item.IsBusy)
         {
             return;
         }
 
-        item.Status = "启动中…";
-        var result = await Task.Run(() => _launchService.Launch(item.Id));
-        if (!result.IsSuccess)
-        {
-            item.Status = "启动失败";
-            ShowError(result.Message);
-            return;
-        }
-
-        item.Status = $"运行中(PID {result.Value.ProcessId})";
-        WatchProcessExit(item, result.Value.ProcessId);
-    }
-
-    private void WatchProcessExit(AccountItemViewModel item, int processId)
-    {
+        SelectedAccount = item;
+        item.IsBusy = true;
+        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
         try
         {
-            var process = Process.GetProcessById(processId);
-            process.EnableRaisingEvents = true;
-            process.Exited += (_, _) =>
+            item.Status = "启动中…";
+            var result = await Task.Run(() => _launchService.Launch(item.Id));
+            if (!result.IsSuccess)
             {
-                System.Windows.Application.Current?.Dispatcher.Invoke(() => item.Status = "未运行");
-                process.Dispose();
-            };
-        }
-        catch (ArgumentException)
-        {
-            // Battle.net 启动器常在交接给常驻进程后退出,这里不视为错误。
+                item.Status = "启动失败";
+                ShowError(result.Message);
+                return;
+            }
             item.Status = "已启动";
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "监视进程 {ProcessId} 退出状态失败", processId);
+            _logger.LogWarning("启动异常，类型 {Type}，HRESULT {HResult}", ex.GetType().Name, ex.HResult);
+            item.Status = "启动失败";
+            ShowError("启动未完成，请检查配置和 BPM 日志后重试。");
+        }
+        finally
+        {
+            item.IsBusy = false;
+            System.Windows.Input.CommandManager.InvalidateRequerySuggested();
         }
     }
+
+    private void ApplyLoginStatus(LoginAssistStatus status)
+    {
+        var item = Accounts.FirstOrDefault(a => a.Id == status.AccountId);
+        if (item is null) return;
+        item.LoginStatus = status.Message;
+        item.NeedsAttention = status.NeedsAttention;
+    }
+
+    private async void RetryLogin()
+    {
+        var item = SelectedAccount;
+        if (item is null || item.IsBusy) return;
+        if (!item.Account.BrowserLoginAssistEnabled)
+        {
+            MessageBox.Show("请先在“编辑配置”中启用“浏览器登录兼容辅助”，保存后重试。", "登录辅助");
+            return;
+        }
+        item.IsBusy = true;
+        try
+        {
+            var status = await Task.Run(() => _loginAssist.Start(item.Account));
+            ApplyLoginStatus(status);
+            if (status.NeedsAttention) ShowLoginHelp(item);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("重试辅助失败，类型 {Type}，HRESULT {HResult}", ex.GetType().Name, ex.HResult);
+            item.LoginStatus = "登录辅助不可用，请查看手动登录指引";
+            item.NeedsAttention = true;
+            ShowLoginHelp(item);
+        }
+        finally { item.IsBusy = false; System.Windows.Input.CommandManager.InvalidateRequerySuggested(); }
+    }
+
+    private void ShowLoginHelp() { if (SelectedAccount is { } item) ShowLoginHelp(item); }
+
+    private static void ShowLoginHelp(AccountItemViewModel item) => MessageBox.Show(
+        $"配置：{item.DisplayName}  ·  Windows 用户：{item.WindowsUser}\n当前状态：{item.LoginStatus}\n\n{ManualLoginGuide.ForUser(item.WindowsUser)}",
+        "浏览器未打开？手动登录指引", MessageBoxButton.OK, MessageBoxImage.Information);
 
     private void CreateShortcut()
     {
@@ -208,7 +260,8 @@ public class MainViewModel : ObservableObject
             return;
         }
 
-        MessageBox.Show($"已创建桌面快捷方式:\n{result.Value}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+        var elevationHint = "\n\nBPM 尚未运行时会自动请求管理员权限；已运行时会把配置启动请求交给现有实例。";
+        MessageBox.Show($"已创建桌面快捷方式:\n{result.Value}{elevationHint}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void ImportConfig()
@@ -230,6 +283,7 @@ public class MainViewModel : ObservableObject
             return;
         }
 
+        foreach (var item in Accounts) _loginAssist.Stop(item.Id);
         Reload();
         MessageBox.Show("导入完成。注意:密码不随配置导出/导入,请为每个账户重新输入密码。",
             "导入配置", MessageBoxButton.OK, MessageBoxImage.Information);

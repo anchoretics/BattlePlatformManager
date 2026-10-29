@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using BPM.Application.Abstractions;
 using BPM.Domain.Models;
+using BPM.Domain.Validation;
 using BPM.Shared;
 using Microsoft.Extensions.Logging;
 
@@ -41,9 +42,7 @@ public class JsonConfigService : IConfigService
 
             var json = File.ReadAllText(_configPath);
             var config = JsonSerializer.Deserialize<Config>(json, SerializerOptions);
-            return config is null
-                ? Result<Config>.Fail(ErrorCode.ConfigCorrupted, "配置文件内容为空或无效。")
-                : Result<Config>.Ok(config);
+            return Validate(config);
         }
         catch (JsonException ex)
         {
@@ -59,6 +58,8 @@ public class JsonConfigService : IConfigService
 
     public Result Save(Config config)
     {
+        var validation = Validate(config);
+        if (!validation.IsSuccess) return validation;
         try
         {
             var directory = Path.GetDirectoryName(_configPath);
@@ -110,13 +111,11 @@ public class JsonConfigService : IConfigService
 
             var json = File.ReadAllText(sourcePath);
             var config = JsonSerializer.Deserialize<Config>(json, SerializerOptions);
-            if (config is null)
-            {
-                return Result<Config>.Fail(ErrorCode.ConfigCorrupted, "导入文件内容无效。");
-            }
+            var validation = Validate(config);
+            if (!validation.IsSuccess) return validation;
 
-            var save = Save(config);
-            return save.IsSuccess ? Result<Config>.Ok(config) : Result<Config>.Fail(save);
+            var save = Save(validation.Value);
+            return save.IsSuccess ? validation : Result<Config>.Fail(save);
         }
         catch (JsonException ex)
         {
@@ -126,5 +125,24 @@ public class JsonConfigService : IConfigService
         {
             return Result<Config>.Fail(ErrorCode.Unexpected, $"导入配置失败:{ex.Message}");
         }
+    }
+
+    private static Result<Config> Validate(Config? config)
+    {
+        if (config?.Accounts is null || config.BattleNetPath is null || config.WowPath is null)
+            return Result<Config>.Fail(ErrorCode.ConfigCorrupted, "配置结构无效：账户列表和路径字段不能为 null。");
+        var ids = new HashSet<Guid>();
+        for (var index = 0; index < config.Accounts.Count; index++)
+        {
+            var account = config.Accounts[index];
+            if (account is null || account.WowPath is null)
+                return Result<Config>.Fail(ErrorCode.ConfigCorrupted, $"第 {index + 1} 个账户配置无效。");
+            var validation = AccountValidator.Validate(account);
+            if (!validation.IsSuccess)
+                return Result<Config>.Fail(ErrorCode.ConfigCorrupted, $"第 {index + 1} 个账户配置无效：{validation.Message}");
+            if (!ids.Add(account.Id))
+                return Result<Config>.Fail(ErrorCode.ConfigCorrupted, "配置中存在重复的账户 Id。");
+        }
+        return Result<Config>.Ok(config);
     }
 }
